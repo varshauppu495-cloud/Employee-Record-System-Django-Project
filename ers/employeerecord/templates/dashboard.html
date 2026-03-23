@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+{% if user.user_type == '1' %}
+<div class="container-fluid">
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{user.first_name}} {{user.last_name}} Dashboard</h1>
+        <a href="{% url 'admin_profile' %}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i
+                class="fas fa-download fa-sm text-white-50"></i> View Profile</a>
+    </div>
+
+    <!-- Content Row -->
+    <div class="row">
+
+   
+
+        <!-- Earnings (Monthly) Card Example -->
+        <div class="col-xl-12 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <h1 class="h3 mb-0 text-gray-800">
+                                Total Registered Employees<h1>
+                            <div class="h3 mb-0 font-weight-bold text-gray-800">{{emp_count}}</div>
+                        </div>
+                        <div class="col-auto">
+                            <div class="col-auto">
+                                <a href="{% url 'all_employees' %}"><i class="fas fa-users fa-2x text-gray-300"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+     
+
+
+    <!-- Content Row -->
+
+    
+
+
+</div>
+{% else  %}
+<div class="container-fluid">
+
+
+    <!-- Content Row -->
+    <div class="row">
+
+        <!-- Earnings (Monthly) Card Example -->
+        <div class="col-xl-12 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-6">
+                            <h1 class="h3 mb-0 text-gray-800">Welcome Back To ERS!! {{user.first_name}} {{user.last_name}}</h1>
+                            <br>
+                            <a href="{% url 'emp_profile' %}" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i
+                                class="fas fa-download fa-sm text-white-50"></i> View Profile</a>
+                        </div>
+                       
+                    </div>
+                </div>
+            </div>
+        </div>
+
+     
+    </div>
+
+    <!-- Content Row -->
+
+    
+
+
+</div>
+{% endif %}
+{% endblock %}
