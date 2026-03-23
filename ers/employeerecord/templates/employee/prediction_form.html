@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">Prediction Form</h1>
+            <p class="text-muted mb-0">Predict your performance using multiple machine learning algorithms.</p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm border-0 profile-card">
+                <div class="card-body">
+                    {% include 'includes/messages.html' %}
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="uiverse-section">
+                            <div class="form-row">
+                                <div class="form-group col-md-6"><label>Attendance %</label>{{ form.attendance|add_class:"form-control" }}</div>
+                                <div class="form-group col-md-6"><label>Study Hours/Day</label>{{ form.study_hours|add_class:"form-control" }}</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6"><label>Previous Score</label>{{ form.previous_score|add_class:"form-control" }}</div>
+                                <div class="form-group col-md-6"><label>Assignments Submitted</label>{{ form.assignments_submitted|add_class:"form-control" }}</div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group col-md-6"><label>Extracurricular Score</label>{{ form.extracurricular_score|add_class:"form-control" }}</div>
+                                <div class="form-group col-md-6"><label>Algorithm</label>{{ form.model_choice|add_class:"form-control" }}</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn uiverse-btn">Generate Prediction</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm border-0 dashboard-panel glass-card h-100">
+                <div class="card-body">
+                    <h4 class="panel-title">Latest Result</h4>
+                    {% if latest_prediction %}
+                    <div class="result-chip">{{ latest_prediction.predicted_label }}</div>
+                    <p class="mt-3 mb-2">Algorithm: <strong>{{ latest_prediction.model_used }}</strong></p>
+                    <p class="mb-2">Confidence: <strong>{{ latest_prediction.confidence_score }}%</strong></p>
+                    <p class="mb-2">Predicted Score: <strong>{{ latest_prediction.predicted_score }}</strong></p>
+                    <p class="panel-copy">{{ latest_prediction.notes }}</p>
+                    {% if chart_image %}
+                    <img src="data:image/png;base64,{{ chart_image }}" alt="Prediction Chart" class="img-fluid rounded shadow-sm mt-2">
+                    {% endif %}
+                    {% if outcome_form %}
+                    <hr>
+                    <h5 class="mb-3">Add Actual Result</h5>
+                    <form method="POST" action="{% url 'update_actual_outcome' latest_prediction.id %}">
+                        {% csrf_token %}
+                        <div class="form-group"><label>Actual Outcome</label>{{ outcome_form.actual_outcome|add_class:"form-control" }}</div>
+                        <div class="form-group"><label>Actual Score</label>{{ outcome_form.actual_score|add_class:"form-control" }}</div>
+                        <div class="form-group"><label>Notes</label>{{ outcome_form.notes|add_class:"form-control" }}</div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Save Actual Result</button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <p class="panel-copy mb-0">No prediction generated yet. Submit the form to create your first prediction.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

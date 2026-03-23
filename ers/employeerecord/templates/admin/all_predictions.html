@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">Prediction Details</h1>
+            <p class="text-muted mb-0">Review model usage, prediction history, and update actual outcomes.</p>
+        </div>
+    </div>
+    {% include 'includes/messages.html' %}
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm border-0 dashboard-panel chart-panel">
+                <div class="card-body">
+                    <h4 class="panel-title mb-3">Prediction Category Insights</h4>
+                    <canvas id="predictionInsightsChart" height="130"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm border-0 dashboard-panel chart-panel">
+                <div class="card-body">
+                    <h4 class="panel-title mb-3">Algorithm Adoption</h4>
+                    <canvas id="modelUsageChart" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card shadow-sm border-0 employee-table-card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Prediction</th>
+                            <th>Model</th>
+                            <th>Confidence</th>
+                            <th>Predicted Score</th>
+                            <th>Actual Outcome</th>
+                            <th>Actual Score</th>
+                            <th>Update</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in predictions %}
+                        <tr>
+                            <td>{{ item.student.student_id }} - {{ item.student.admin.first_name }}</td>
+                            <td>{{ item.predicted_label }}</td>
+                            <td>{{ item.model_used }}</td>
+                            <td>{{ item.confidence_score }}%</td>
+                            <td>{{ item.predicted_score }}</td>
+                            <td>{{ item.actual_outcome|default:"-" }}</td>
+                            <td>{{ item.actual_score|default:"-" }}</td>
+                            <td>
+                                <form method="POST" action="{% url 'admin_update_prediction_outcome' item.id %}" class="mini-form">
+                                    {% csrf_token %}
+                                    <input type="text" name="actual_outcome" value="{{ item.actual_outcome }}" class="form-control form-control-sm mb-2" placeholder="Outcome">
+                                    <input type="number" step="0.01" name="actual_score" value="{{ item.actual_score }}" class="form-control form-control-sm mb-2" placeholder="Score">
+                                    <input type="text" name="notes" value="{{ item.notes }}" class="form-control form-control-sm mb-2" placeholder="Notes">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center py-4 text-muted">No predictions generated yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{{ analytics_json|json_script:"admin-prediction-analytics" }}
+<script>
+const adminPredictionAnalytics = JSON.parse(document.getElementById('admin-prediction-analytics').textContent);
+new Chart(document.getElementById('predictionInsightsChart'), {
+    type: 'bar',
+    data: {
+        labels: adminPredictionAnalytics.prediction_labels,
+        datasets: [{ label: 'Count', data: adminPredictionAnalytics.prediction_counts, backgroundColor: ['#34d399', '#38bdf8', '#fbbf24', '#fb7185'] }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+});
+new Chart(document.getElementById('modelUsageChart'), {
+    type: 'pie',
+    data: {
+        labels: adminPredictionAnalytics.model_labels,
+        datasets: [{ data: adminPredictionAnalytics.model_counts, backgroundColor: ['#0f4c81', '#1f7a8c', '#4cc9f0', '#f59e0b'] }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+});
+</script>
+{% endblock %}

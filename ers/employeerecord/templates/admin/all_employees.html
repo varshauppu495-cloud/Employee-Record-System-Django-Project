@@ -1,94 +1,53 @@
 {% extends 'base.html' %}
 {% block content %}
-{% load static %}
-
 <div class="container-fluid">
-
-    <!-- Page Heading -->
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">View The List Of Employees</h1>
-        
+        <div>
+            <h1 class="h3 mb-1 text-gray-800">Registered Students</h1>
+            <p class="text-muted mb-0">Manage profiles, academic indicators, and monitor at-risk learners.</p>
+        </div>
+        <div class="glass-pill">At Risk Students: {{ at_risk_count }}</div>
     </div>
 
-    <!-- Content Row -->
-    <div class="row">
-
-        <!-- Earnings (Monthly) Card Example -->
-       
-
-      
-
-        <!-- Pending Requests Card Example -->
-        <div class="col-xl-12 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <h4 class="card-title">View The List Of Employees</h4>
-         <hr>
-        
-           
-         {% include 'includes/messages.html' %}
-
-         <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
-
-            <tr>
-              <th>S no.</th>
-              <th>Emp Code</th>
-              <th>Emp First Name</th>
-              <th>Emp Last Name</th>
-              <th>Emp Email</th>
-              <th>Emp Contact no</th>
-              <th>Emp Joining Date</th>
-              <th>Action</th>
-              
-            </tr>
-            
-            {% for i in emplist %}
-            <tr>
-              <td>{{ i.id }}</td>
-              <td>{{i.empcode}}</td>
-              <td>{{i.admin.first_name}}</td>
-               <td>{{i.admin.last_name}}</td>
-               
-              <td>{{i.admin.email}}</td>
-              <td>{{i.mobilenumber}}</td>
-              <td>{{i.regdate_at}}</td>
-              <td><p></p><a href="{% url 'view_emp_profile' i.id %}" class="btn btn-primary btn-sm">Edit Profile</a>
-               <a href="{% url 'view_emp_education' i.admin.id %}" class="btn btn-warning btn-sm">Edit Education </a></p>
-                  <p>
-                <a href="{% url 'view_emp_experience' i.admin.id %}" class="btn btn-info btn-sm">Edit Experience </a>
-                <a href="{% url 'delete_employee_details' i.admin.id %}" style="color:#fff" class="btn btn-danger btn-sm" onclick="return confirm('Do you really want to delete');" style="color:red">Delete</a>
-              </p></td>
-            </tr>
-            
-            {% endfor %}
-            
-            </table>
-            <div class="pagination" style="padding-top: 10px;text-align: center;">
-                <span class="step-links">
-                    {% if emplist.has_previous %}
-                        <a href="?page=1">&laquo; first</a>
-                        <a href="?page={{ emplist.previous_page_number }}">previous</a>
-                    {% endif %}
-            
-                    <span class="current">
-                        Page {{ emplist.number }} of {{ emplist.paginator.num_pages }}.
-                    </span>
-            
-                    {% if emplist.has_next %}
-                        <a href="?page={{ emplist.next_page_number }}">next</a>
-                        <a href="?page={{ emplist.paginator.num_pages }}">last &raquo;</a>
-                    {% endif %}
-                </span>
-            </div>
-                </div>
+    <div class="card shadow-sm border-0 employee-table-card">
+        <div class="card-body">
+            {% include 'includes/messages.html' %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Course</th>
+                            <th>Semester</th>
+                            <th>Attendance</th>
+                            <th>Prev. Score</th>
+                            <th>Assignments</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in student_list %}
+                        <tr>
+                            <td>{{ student.student_id }}</td>
+                            <td>{{ student.admin.first_name }} {{ student.admin.last_name }}</td>
+                            <td>{{ student.course|default:"-" }}</td>
+                            <td>{{ student.semester|default:"-" }}</td>
+                            <td>{{ student.attendance }}%</td>
+                            <td>{{ student.previous_score }}</td>
+                            <td>{{ student.assignments_submitted }}</td>
+                            <td class="action-cell">
+                                <a href="{% url 'view_emp_profile' student.id %}" class="btn btn-primary btn-sm">Edit</a>
+                                <a href="{% url 'delete_employee_details' student.admin.id %}" class="btn btn-danger btn-sm" onclick="return confirm('Delete this student?');">Delete</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center py-4 text-muted">No students registered yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-
-    <!-- Content Row -->
-
-    
-
-
 </div>
 {% endblock %}

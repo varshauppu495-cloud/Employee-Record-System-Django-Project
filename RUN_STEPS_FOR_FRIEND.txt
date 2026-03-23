@@ -1,0 +1,55 @@
+STUDENT PERFORMANCE PREDICTION SYSTEM
+STEP BY STEP RUN GUIDE
+
+1. Open Command Prompt or VS Code terminal.
+
+2. Go to the project folder:
+cd /d C:\Users\srava\Downloads\Employee-Record-System-Django-Project\ers\employeerecord
+
+3. Activate virtual environment if available:
+C:\Users\srava\Downloads\Employee-Record-System-Django-Project\.venv\Scripts\activate.bat
+
+4. Install required packages:
+python -m pip install -r ..\..\requirements.txt
+
+5. Apply database migrations:
+python manage.py migrate
+
+6. Start the Django server:
+python manage.py runserver
+
+7. Open this URL in browser:
+http://127.0.0.1:8000/
+
+DEFAULT WORKING LOGIN
+
+Admin:
+username: admin
+password: admin123
+
+Student:
+username: student1
+password: student123
+
+MAIN FEATURES
+
+- Student registration
+- Student profile management
+- Prediction form with multiple ML algorithms
+- Prediction history with charts
+- Admin dashboard
+- Registered students list
+- Prediction details with analytics
+- SQLite database only, no external server needed
+
+IF SOMETHING DOES NOT WORK
+
+1. Check that you are inside:
+C:\Users\srava\Downloads\Employee-Record-System-Django-Project\ers\employeerecord
+
+2. Run again:
+python manage.py migrate
+python manage.py runserver
+
+3. If package error comes:
+python -m pip install -r ..\..\requirements.txt

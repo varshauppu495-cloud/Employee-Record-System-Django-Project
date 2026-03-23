@@ -10,7 +10,7 @@ class CustomUser(AbstractUser):
     }
     user_type = models.CharField(choices=USER,max_length=50,default=1)
 
-    profile_pic = models.ImageField(upload_to='media/profile_pic')
+    profile_pic = models.ImageField(upload_to='profile_pic', default='profile_pic/user.png', blank=True)
 
 
 class Employees(models.Model):
@@ -66,4 +66,64 @@ class empexperience(models.Model):
     Employer3CTC =models.CharField(max_length=200,default="0")
     Employer3WorkDuration =models.CharField(max_length=200,default="0")
     creationdate = models.DateTimeField(auto_now_add=True)
+
+
+class StudentProfile(models.Model):
+    admin = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='student_profile')
+    student_id = models.CharField(max_length=20, unique=True)
+    mobile_number = models.CharField(max_length=15, blank=True)
+    gender = models.CharField(max_length=20, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    course = models.CharField(max_length=120, blank=True)
+    semester = models.CharField(max_length=30, blank=True)
+    guardian_name = models.CharField(max_length=120, blank=True)
+    contact_email = models.EmailField(blank=True)
+    address = models.CharField(max_length=250, blank=True)
+    attendance = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    study_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    previous_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    assignments_submitted = models.PositiveIntegerField(default=0)
+    extracurricular_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.student_id} - {self.admin.get_full_name() or self.admin.username}"
+
+
+class PredictionHistory(models.Model):
+    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='predictions')
+    predicted_label = models.CharField(max_length=50)
+    model_used = models.CharField(max_length=50, default='Auto')
+    confidence_score = models.DecimalField(max_digits=5, decimal_places=2)
+    predicted_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    attendance = models.DecimalField(max_digits=5, decimal_places=2)
+    study_hours = models.DecimalField(max_digits=5, decimal_places=2)
+    previous_score = models.DecimalField(max_digits=5, decimal_places=2)
+    assignments_submitted = models.PositiveIntegerField(default=0)
+    extracurricular_score = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    actual_outcome = models.CharField(max_length=50, blank=True)
+    actual_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.student.student_id} - {self.predicted_label}"
+
+
+class SystemActivityLog(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=120)
+    details = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        username = self.user.username if self.user else 'system'
+        return f"{username} - {self.action}"
 

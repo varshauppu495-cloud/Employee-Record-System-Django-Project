@@ -1,319 +1,264 @@
-from django.shortcuts import render,redirect,HttpResponse
-from django.contrib.auth.decorators import login_required
-from ersapp.models import CustomUser,Employees,empeducation,empexperience
-from django.contrib.auth import get_user_model
+import json
+
 from django.contrib import messages
-from django.core.exceptions import ObjectDoesNotExist
-from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
-User = get_user_model()
+from django.shortcuts import get_object_or_404, redirect, render
+
+from ersapp.forms import ActualOutcomeForm, PredictionInputForm, StudentProfileForm, StudentRegistrationForm
+from ersapp.ml_utils import build_history_chart, build_prediction_chart, predict_student_performance
+from ersapp.models import CustomUser, PredictionHistory, StudentProfile, SystemActivityLog
+
+
+def _log_action(user, action, details=''):
+    SystemActivityLog.objects.create(user=user, action=action, details=details)
+
+
+def _student_profile_defaults(user):
+    return {
+        'student_id': f"STU{user.id:04d}",
+        'mobile_number': '',
+        'gender': '',
+        'course': '',
+        'semester': '',
+        'guardian_name': '',
+        'contact_email': user.email,
+        'address': '',
+        'attendance': 0,
+        'study_hours': 0,
+        'previous_score': 0,
+        'assignments_submitted': 0,
+        'extracurricular_score': 0,
+    }
+
+
+def _get_or_create_profile(user):
+    profile, _ = StudentProfile.objects.get_or_create(
+        admin=user,
+        defaults=_student_profile_defaults(user),
+    )
+    return profile
+
 
 def EMPSIGNUP(request):
-   
-    if request.method == "POST":
-        pic = request.FILES.get('pic')
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        username = request.POST.get('username')
-        email = request.POST.get('email')
-        mobno = request.POST.get('mobno')        
-        password = request.POST.get('password')
-
-        if CustomUser.objects.filter(email=email).exists():
-            messages.warning(request,'Email already exist')
-            return redirect('empsignup')
-        if CustomUser.objects.filter(username=username).exists():
-            messages.warning(request,'Username already exist')
-            return redirect('empsignup')
-        else:
-            user = CustomUser(
-               first_name=first_name,
-               last_name=last_name,
-               username=username,
-               email=email,
-               user_type=2,
-               profile_pic = pic,
-            )
-            user.set_password(password)
-            user.save()            
-            emp = Employees(
-                admin = user,                
-                mobilenumber = mobno,              
-                
-            )
-            emp.save()            
-            messages.success(request,'Signup Successfully')
-            return redirect('empsignup')
-    
-    
-
-    return render(request,'employee/emp_reg.html')
-
-login_required(login_url='/')
-def EMP_PROFILE(request):
-    
-    emp =Employees.objects.get(admin_id =request.user.id)
-    
-    context = {
-        
-        "emp":emp,
-    }
-    return render(request,'employee/emp_profile.html',context)
-
-
-@login_required(login_url = '/')
-def EMP_PROFILE_UPDATE(request):
-    if request.method == "POST":
+    form = StudentRegistrationForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        data = form.cleaned_data
         try:
-            customuser = CustomUser.objects.get(id=request.user.id)
-            emp = Employees.objects.get(admin_id=request.user.id)
+            if CustomUser.objects.filter(email=data['email']).exists():
+                messages.warning(request, 'Email already exists.')
+                return redirect('student_signup')
+            if CustomUser.objects.filter(username=data['username']).exists():
+                messages.warning(request, 'Username already exists.')
+                return redirect('student_signup')
+            if StudentProfile.objects.filter(student_id=data['student_id']).exists():
+                messages.warning(request, 'Student ID already exists.')
+                return redirect('student_signup')
 
-            # Update user data
-            customuser.first_name = request.POST.get('first_name', customuser.first_name)
-            customuser.last_name = request.POST.get('last_name', customuser.last_name)
-            if 'profile_pic' in request.FILES:
-                customuser.profile_pic = request.FILES['profile_pic']
-            customuser.save()
+            user = CustomUser(
+                first_name=data['first_name'],
+                last_name=data['last_name'],
+                username=data['username'],
+                email=data['email'],
+                user_type='2',
+                profile_pic=data.get('pic'),
+            )
+            user.set_password(data['password'])
+            user.save()
 
-            # Update employee data
-            emp.mobilenumber = request.POST.get('mobilenumber', emp.mobilenumber)
-            emp.gender = request.POST.get('gender', emp.gender)
-            emp.empcode = request.POST.get('empcode', emp.empcode)
-            emp.empdept = request.POST.get('empdept', emp.empdept)
-            emp.gender = request.POST.get('gender', emp.gender)
-            emp.empdesignation = request.POST.get('empdesignation', emp.empdesignation)
-            emp.address = request.POST.get('address', emp.address)
-            emp.save()
-
-            messages.success(request, "Your profile has been updated successfully")
-            return redirect('emp_profile')
-        except ObjectDoesNotExist:
-            messages.error(request, "User or employee profile not found")
+            StudentProfile.objects.create(
+                admin=user,
+                student_id=data['student_id'],
+                mobile_number=data.get('mobile_number') or '',
+                course=data.get('course') or '',
+                semester=data.get('semester') or '',
+                contact_email=data['email'],
+                attendance=data.get('attendance') or 0,
+                study_hours=data.get('study_hours') or 0,
+                previous_score=data.get('previous_score') or 0,
+                assignments_submitted=data.get('assignments_submitted') or 0,
+                extracurricular_score=data.get('extracurricular_score') or 0,
+            )
+            _log_action(user, 'Student Registration', f"New student account created: {data['student_id']}")
+            messages.success(request, 'Student registration completed successfully.')
+            return redirect('login')
         except IntegrityError:
-            messages.error(request, "Employee code must be unique")
-            return redirect('emp_profile')
-        except Exception as e:
-            messages.error(request, f"An error occurred: {str(e)}")
+            messages.error(request, 'Unable to create the student account.')
 
-    return render(request, 'employee/emp_profile.html')
+    return render(request, 'employee/emp_reg.html', {'form': form})
+
+
+@login_required(login_url='/')
+def EMP_PROFILE(request):
+    profile = _get_or_create_profile(request.user)
+    form = StudentProfileForm(initial={
+        'first_name': request.user.first_name,
+        'last_name': request.user.last_name,
+        'student_id': profile.student_id,
+        'mobile_number': profile.mobile_number,
+        'gender': profile.gender,
+        'date_of_birth': profile.date_of_birth,
+        'course': profile.course,
+        'semester': profile.semester,
+        'guardian_name': profile.guardian_name,
+        'contact_email': profile.contact_email,
+        'address': profile.address,
+        'attendance': profile.attendance,
+        'study_hours': profile.study_hours,
+        'previous_score': profile.previous_score,
+        'assignments_submitted': profile.assignments_submitted,
+        'extracurricular_score': profile.extracurricular_score,
+    })
+    return render(request, 'employee/emp_profile.html', {'student': profile, 'form': form})
+
+
+@login_required(login_url='/')
+def EMP_PROFILE_UPDATE(request):
+    profile = _get_or_create_profile(request.user)
+    if request.method == 'POST':
+        form = StudentProfileForm(request.POST, request.FILES)
+        if form.is_valid():
+            user = request.user
+            user.first_name = form.cleaned_data['first_name']
+            user.last_name = form.cleaned_data['last_name']
+            if form.cleaned_data.get('profile_pic'):
+                user.profile_pic = form.cleaned_data['profile_pic']
+            user.save()
+
+            for field in form.Meta.fields:
+                setattr(profile, field, form.cleaned_data[field])
+            try:
+                profile.save()
+                _log_action(user, 'Profile Update', f'Updated profile for {profile.student_id}')
+                messages.success(request, 'Student profile updated successfully.')
+            except IntegrityError:
+                messages.error(request, 'Student ID must be unique.')
+        else:
+            messages.error(request, 'Please correct the profile form errors.')
+    return redirect('student_profile')
+
+
+@login_required(login_url='/')
+def PREDICTION_FORM(request):
+    profile = _get_or_create_profile(request.user)
+    latest_prediction = profile.predictions.first()
+    chart_image = None
+    form = PredictionInputForm(initial={
+        'attendance': profile.attendance,
+        'study_hours': profile.study_hours,
+        'previous_score': profile.previous_score,
+        'assignments_submitted': profile.assignments_submitted,
+        'extracurricular_score': profile.extracurricular_score,
+        'model_choice': 'auto',
+    })
+
+    if request.method == 'POST':
+        form = PredictionInputForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            profile.attendance = data['attendance']
+            profile.study_hours = data['study_hours']
+            profile.previous_score = data['previous_score']
+            profile.assignments_submitted = data['assignments_submitted']
+            profile.extracurricular_score = data['extracurricular_score']
+            profile.save()
+
+            prediction = predict_student_performance(data, data['model_choice'])
+            latest_prediction = PredictionHistory.objects.create(
+                student=profile,
+                predicted_label=prediction['label'],
+                model_used=prediction['model_name'],
+                confidence_score=prediction['confidence'],
+                predicted_score=prediction['score'],
+                attendance=profile.attendance,
+                study_hours=profile.study_hours,
+                previous_score=profile.previous_score,
+                assignments_submitted=profile.assignments_submitted,
+                extracurricular_score=profile.extracurricular_score,
+                notes='Generated from current academic indicators and selected ML model.',
+            )
+            chart_image = build_prediction_chart(data, prediction['score'])
+            _log_action(request.user, 'Prediction Generated', f"{profile.student_id} using {prediction['model_name']}")
+            messages.success(request, 'Performance prediction generated successfully.')
+        else:
+            messages.error(request, 'Please correct the prediction form errors.')
+
+    if latest_prediction and not chart_image:
+        chart_image = build_prediction_chart({
+            'attendance': latest_prediction.attendance,
+            'study_hours': latest_prediction.study_hours,
+            'previous_score': latest_prediction.previous_score,
+            'assignments_submitted': latest_prediction.assignments_submitted,
+            'extracurricular_score': latest_prediction.extracurricular_score,
+        }, latest_prediction.predicted_score)
+
+    outcome_form = ActualOutcomeForm(instance=latest_prediction) if latest_prediction else None
+    return render(
+        request,
+        'employee/prediction_form.html',
+        {
+            'student': profile,
+            'form': form,
+            'latest_prediction': latest_prediction,
+            'chart_image': chart_image,
+            'outcome_form': outcome_form,
+        },
+    )
+
+
+@login_required(login_url='/')
+def UPDATE_ACTUAL_OUTCOME(request, prediction_id):
+    prediction = get_object_or_404(PredictionHistory, id=prediction_id, student__admin=request.user)
+    if request.method == 'POST':
+        form = ActualOutcomeForm(request.POST, instance=prediction)
+        if form.is_valid():
+            form.save()
+            _log_action(request.user, 'Actual Outcome Updated', f'Prediction #{prediction.id}')
+            messages.success(request, 'Actual outcome updated successfully.')
+    return redirect('prediction_form')
+
+
+@login_required(login_url='/')
+def PREDICTION_HISTORY(request):
+    profile = _get_or_create_profile(request.user)
+    predictions = profile.predictions.all()
+    history_chart = build_history_chart(predictions)
+    return render(
+        request,
+        'employee/prediction_history.html',
+        {
+            'student': profile,
+            'predictions': predictions,
+            'history_chart_json': json.dumps(history_chart),
+        },
+    )
+
 
 @login_required(login_url='/')
 def EMP_EDUCATION(request):
-    # Check if the user is authenticated
-    if request.user.is_authenticated:
-        if request.method == "POST":
-            # Retrieve the Employees instance associated with the current user
-            employee = Employees.objects.get(admin_id=request.user.id)
-            custom_user = employee.admin
-            # Create an instance of EmpEducation and assign the admin attribute of the Employees instance to the empid field
-            empedu = empeducation(
-                CoursePG=request.POST.get('CoursePG'),
-                SchoolCollegePG=request.POST.get('SchoolCollegePG'),
-                YearPassingPG=request.POST.get('YearPassingPG'),
-                PercentagePG=request.POST.get('PercentagePG'),
-                CourseGra=request.POST.get('CourseGra'),
-                SchoolCollegeGra=request.POST.get('SchoolCollegeGra'),
-                YearPassingGra=request.POST.get('YearPassingGra'),
-                PercentageGra=request.POST.get('PercentageGra'),
-                CourseSSC=request.POST.get('CourseSSC'),
-                SchoolCollegeSSC=request.POST.get('SchoolCollegeSSC'),
-                YearPassingSSC=request.POST.get('YearPassingSSC'),
-                PercentageSSC=request.POST.get('PercentageSSC'),
-                CourseHSC=request.POST.get('CourseHSC'),
-                SchoolCollegeHSC=request.POST.get('SchoolCollegeHSC'),
-                YearPassingHSC=request.POST.get('YearPassingHSC'),
-                PercentageHSC=request.POST.get('PercentageHSC'),
-                empid=custom_user  # Assign the Employees instance to the empid field
-            )
-            empedu.save()
-            messages.warning(request, 'Your education details have been added successfully!!!')
-            return redirect("emp_education")
-        else:
-            # Retrieve existing education details for the current user
-            try:
-                eedu = empeducation.objects.get(empid=request.user.id)
-                context = {'eedu': eedu}
-            except empeducation.DoesNotExist:
-                context = {}  # If no education details found, pass an empty context
-            return render(request, 'employee/myeducation.html', context)
-    else:
-        messages.error(request, 'You need to login to access this page.')
-        return redirect('login')  # Redirect to the login page if the user is not authenticated
+    return redirect('prediction_form')
 
-        
+
 @login_required(login_url='/')
 def EMP_EXPERIENCE(request):
-    if request.method == "POST":
-        # Check if the user is authenticated
-        if request.user.is_authenticated:
-            # Retrieve the Employees instance associated with the current user
-            employee = Employees.objects.get(admin_id=request.user.id)
-            # Retrieve the CustomUser instance associated with the Employees instance
-            custom_user = employee.admin
-            
-            # Now create an instance of empexperience and assign the admin attribute of the Employees instance to the empid field
-            empexp = empexperience(
-                Employer1Name=request.POST.get('Employer1Name'),
-                Employer1Designation=request.POST.get('Employer1Designation'),
-                Employer1CTC=request.POST.get('Employer1CTC'),
-                Employer1WorkDuration=request.POST.get('Employer1WorkDuration'),
-                Employer2Name=request.POST.get('Employer2Name'),
-                Employer2Designation=request.POST.get('Employer2Designation'),
-                Employer2CTC=request.POST.get('Employer2CTC'),
-                Employer2WorkDuration=request.POST.get('Employer2WorkDuration'),
-                Employer3Name=request.POST.get('Employer3Name'),
-                Employer3Designation=request.POST.get('Employer3Designation'),
-                Employer3CTC=request.POST.get('Employer3CTC'),
-                Employer3WorkDuration=request.POST.get('Employer3WorkDuration'),
-                empid=custom_user  # Assign the CustomUser instance to the empid field
-            )
-            empexp.save()
-            messages.warning(request, 'Your experience details have been added successfully!!!')
-            return redirect("emp_exp")
-    else:
-        if request.user.is_authenticated:
-            # Retrieve existing experience details for the current user
-            try:
-                eexp = empexperience.objects.get(empid=request.user.id)
-                context = {'eexp': eexp}
-            except empexperience.DoesNotExist:
-                context = {}  # If no experience details found, pass an empty context
-            return render(request, 'employee/myexp.html', context)
-        else:
-            messages.error(request, 'You need to login to access this page.')
-            return redirect('login')
-      
-  
+    return redirect('prediction_history')
 
 
 @login_required(login_url='/')
 def EMP_EDUCATION_VIEW(request):
-    try:
-        emp_edu = empeducation.objects.get(empid_id=request.user.id)
-    except empeducation.DoesNotExist:
-        # If the education data doesn't exist for the user, set emp_edu to None
-        emp_edu = None
+    return redirect('prediction_form')
 
-    context = {
-        "emp_edu": emp_edu,
-    }
-    return render(request, 'employee/emp_education_view.html', context)
 
-login_required(login_url='/')
+@login_required(login_url='/')
 def UPDATE_EMPLOYEE_EDUCATIONS(request):
-    if request.method == "POST":
-        employee_id = request.POST.get('employee_id')
-        CoursePG = request.POST.get('CoursePG')
-        SchoolCollegePG = request.POST.get('SchoolCollegePG')
-        YearPassingPG = request.POST.get('YearPassingPG')
-        PercentagePG = request.POST.get('PercentagePG')
-        CourseGra = request.POST.get('CourseGra')
-        SchoolCollegeGra = request.POST.get('SchoolCollegeGra')
-        YearPassingGra = request.POST.get('YearPassingGra')
-        PercentageGra = request.POST.get('PercentageGra')
-        CourseSSC = request.POST.get('CourseSSC')
-        SchoolCollegeSSC = request.POST.get('SchoolCollegeSSC')
-        YearPassingSSC = request.POST.get('YearPassingSSC')
-        PercentageSSC = request.POST.get('PercentageSSC')
-        CourseHSC = request.POST.get('CourseHSC')
-        SchoolCollegeHSC = request.POST.get('SchoolCollegeHSC')
-        YearPassingHSC = request.POST.get('YearPassingHSC')
-        PercentageHSC = request.POST.get('PercentageHSC')
-        
-        # Retrieve the employee education object
-        employeeedu = empeducation.objects.get(empid_id=employee_id)
-        
-        # Update the fields
-        employeeedu.CoursePG = CoursePG
-        employeeedu.SchoolCollegePG = SchoolCollegePG
-        employeeedu.YearPassingPG = YearPassingPG
-        employeeedu.PercentagePG = PercentagePG
-        employeeedu.CourseGra = CourseGra
-        employeeedu.SchoolCollegeGra = SchoolCollegeGra
-        employeeedu.YearPassingGra = YearPassingGra
-        employeeedu.PercentageGra = PercentageGra
-        employeeedu.CourseSSC = CourseSSC
-        employeeedu.SchoolCollegeSSC = SchoolCollegeSSC
-        employeeedu.YearPassingSSC = YearPassingSSC
-        employeeedu.PercentageSSC = PercentageSSC
-        employeeedu.CourseHSC = CourseHSC
-        employeeedu.SchoolCollegeHSC = SchoolCollegeHSC
-        employeeedu.YearPassingHSC = YearPassingHSC
-        employeeedu.PercentageHSC = PercentageHSC
-        
-        # Save the changes
-        employeeedu.save()
-        
-        # Add a success message
-        messages.success(request, "Education details have been updated successfully")
-        
-        # Redirect to the view page
-        return redirect('emp_education_view')
-
-    return render(request, 'employee/emp_education_view.html')
-
+    return redirect('prediction_form')
 
 
 @login_required(login_url='/')
 def EMP_EXPERIENCE_VIEW(request):
-    try:
-        emp_exp = empexperience.objects.get(empid_id=request.user.id)
-    except empexperience.DoesNotExist:
-        # If the experience data doesn't exist for the user, set emp_exp to None
-        emp_exp = None
-
-    context = {
-        "emp_exp": emp_exp,
-    }
-    return render(request, 'employee/emp_exp_view.html', context)
+    return redirect('prediction_history')
 
 
-login_required(login_url='/')
+@login_required(login_url='/')
 def UPDATE_EMP_EXPERIENCE(request):
-    if request.method == "POST":
-        employee_id = request.POST.get('employee_id')
-        Employer1Name=request.POST.get('Employer1Name')
-        Employer1Designation=request.POST.get('Employer1Designation')
-        Employer1CTC=request.POST.get('Employer1CTC')
-        Employer1WorkDuration=request.POST.get('Employer1WorkDuration')
-        Employer2Name=request.POST.get('Employer2Name')
-        Employer2Designation=request.POST.get('Employer2Designation')
-        Employer2CTC=request.POST.get('Employer2CTC')
-        Employer2WorkDuration=request.POST.get('Employer2WorkDuration')
-        Employer3Name=request.POST.get('Employer3Name')
-        Employer3Designation=request.POST.get('Employer3Designation')
-        Employer3CTC=request.POST.get('Employer3CTC')
-        Employer3WorkDuration=request.POST.get('Employer3WorkDuration')
-        
-        employee_exp = empexperience.objects.get(empid_id=employee_id)
-        
-        # Update the fields
-        employee_exp.Employer1Name=Employer1Name
-        employee_exp.Employer1Designation=Employer1Designation
-        employee_exp.Employer1CTC=Employer1CTC
-        employee_exp.Employer1WorkDuration=Employer1WorkDuration
-        employee_exp.Employer2Name=Employer2Name
-        employee_exp.Employer2Designation=Employer2Designation
-        employee_exp.Employer2CTC=Employer2CTC
-        employee_exp.Employer2WorkDuration=Employer2WorkDuration
-        employee_exp.Employer3Name=Employer3Name
-        employee_exp.Employer3Designation=Employer3Designation
-        employee_exp.Employer3CTC=Employer3CTC
-        employee_exp.Employer3WorkDuration=Employer3WorkDuration
-    
-     # Save the changes
-        employee_exp.save()
-        
-        # Add a success message
-        messages.success(request, "Experience details have been updated successfully")
-        
-        # Redirect to the view page
-        return redirect('emp_experience_view')
-
-    return render(request, 'employee/emp_exp_view.html')
-
-
-
-
-
-
+    return redirect('prediction_history')

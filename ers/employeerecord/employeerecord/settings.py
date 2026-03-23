@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-ms-s2^-ep+%y0o0(&okmodccx*6ov08b+395sa#9a^epz%@d4^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
 
 
 # Application definition
@@ -40,6 +40,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'ersapp',
 ]
+
+try:
+    import widget_tweaks  # noqa: F401
+except ImportError:
+    widget_tweaks = None
+
+if widget_tweaks:
+    INSTALLED_APPS.append('widget_tweaks')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -73,26 +81,13 @@ WSGI_APPLICATION = 'employeerecord.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-if DEBUG:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+# This project runs fully on local SQLite so it works without MySQL or any server setup.
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': 'erspythondb',
-            'USER': 'root',
-            'PASSWORD': '',
-            'HOST': 'localhost',
-            'PORT': '3306',
-        }
-    }
+}
 
 
 # Password validation
@@ -130,10 +125,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR,'static')
+    os.path.join(BASE_DIR, 'static')
 ]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
